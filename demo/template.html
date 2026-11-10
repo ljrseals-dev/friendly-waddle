@@ -1,0 +1,231 @@
+<!doctype html>
+<title>Pitch Ruler</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: the ruler is the instrument face; source and settings beneath, trace and statistics below. */
+  :root {
+    --bg: #e9eef0; --panel: #f6f9fa; --ink: #13222b; --mute: #55666f; --line: #c3d0d6; --accent: #0a5f86; --accent-ink: #ffffff; --lamp: #b25e00;
+    --f-display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+    --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #0d1519; --panel: #141f25; --ink: #dbe6ea; --mute: #8ea3ac; --line: #28383f; --accent: #f0b447; --accent-ink: #1a1203; --lamp: #f0b447; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #0d1519; --panel: #141f25; --ink: #dbe6ea; --mute: #8ea3ac; --line: #28383f; --accent: #f0b447; --accent-ink: #1a1203; --lamp: #f0b447; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); padding-block: 20px 48px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  main { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; }
+  h1 { font: 700 clamp(34px, 7vw, 54px)/0.95 var(--f-display); margin: 0; text-transform: uppercase; text-wrap: balance; }
+  h2 { font: 600 13px/1 var(--f-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); margin: 0 0 12px; }
+  .sub { color: var(--mute); margin: 8px 0 0; max-width: 64ch; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; min-width: 0; }
+  .scope { padding: 0; overflow: hidden; }
+  .scope-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; padding: 10px 16px; border-bottom: 1px solid var(--line); font: 12px var(--f-mono); color: var(--mute); }
+  .scope-head b { color: var(--ink); font-weight: 500; }
+  canvas { display: block; width: 100%; height: 200px; }
+  canvas + .scope-head { border-top: 1px solid var(--line); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button, select, input[type=file]::file-selector-button { font: 500 14px var(--f-body); border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 4px; padding: 9px 14px; cursor: pointer; }
+  button:hover, select:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button[aria-pressed=true] { outline: 2px solid var(--accent); outline-offset: 1px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px 24px; }
+  label.ctl, .ctl { display: grid; gap: 4px; font-size: 13px; color: var(--mute); }
+  .ctl .v { font: 13px var(--f-mono); color: var(--ink); display: flex; justify-content: space-between; gap: 8px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .size { display: grid; gap: 6px; }
+  .size .ends { display: flex; justify-content: space-between; font: 12px var(--f-mono); color: var(--mute); }
+  .size input { height: 28px; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--ink); }
+  .note { font-size: 12.5px; color: var(--mute); }
+  #status { font: 12px var(--f-mono); color: var(--mute); min-height: 18px; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .two > div { min-width: 0; }
+  ul.cites { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 14px; }
+  cite { font-style: normal; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  table { width: 100%; border-collapse: collapse; font: 13px var(--f-mono); }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--mute); font-weight: 500; }
+  .tw { overflow-x: auto; }
+  .big { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+  .big div { border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; }
+  .big b { display: block; font: 600 26px/1.1 var(--f-display); }
+  .big span { font: 12px var(--f-mono); color: var(--mute); }
+  .warn { color: var(--lamp); font-size: 13px; min-height: 18px; }
+  .note-big { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; padding: 4px 2px 0; }
+  .note-big .nm { font: 700 76px/1 var(--f-display); min-width: 2.2ch; }
+  .note-big .rd { font: 500 20px var(--f-mono); color: var(--mute); }
+  .note-big .rd b { color: var(--ink); font-weight: 500; }
+  .note-big .ok { color: var(--accent); }
+  .seg { display: flex; flex-wrap: wrap; gap: 8px; }
+</style>
+<main>
+  <header>
+    <h1>Pitch Ruler</h1>
+    <p class="sub">A tuner you can check. It tracks pitch with the YIN method, names the note, and shows how many cents sharp or flat you are against a reference you choose. It listens live, analyses a recording (and estimates what A4 the recording was tuned to), or measures a virtual instrument whose true pitch it knows, so you can see for yourself how accurate it is.</p>
+  </header>
+
+  <section class="panel scope" aria-label="Ruler">
+    <div class="note-big" aria-live="polite"><span class="nm" id="nm">--</span><span class="rd"><b id="cents">--</b> cents &nbsp; <b id="hz">--</b> Hz &nbsp; <span id="tag"></span></span></div>
+    <canvas id="ruler" role="img" aria-label="Ruler from minus 50 to plus 50 cents with a needle at the current deviation" style="height:86px"></canvas>
+    <div class="scope-head"><span id="srcInfo">choose a source below</span><span id="clar"></span></div>
+  </section>
+
+  <section class="panel" aria-label="Source">
+    <h2>Source</h2>
+    <div class="seg" role="group" aria-label="Source"><button id="sMic" aria-pressed="true">Microphone</button><button id="sFile" aria-pressed="false">Recording</button><button id="sTest" aria-pressed="false">Test instrument</button></div>
+    <div id="pMic" style="margin-top:14px"><div class="row"><button id="micGo" class="primary">Start listening</button><button id="micStop">Stop</button><span id="micSt" role="status"></span></div>
+      <p class="note">Browser echo cancellation, noise suppression and automatic gain are switched off where the browser allows it. Wear headphones if a reference tone is playing.</p></div>
+    <div id="pFile" hidden style="margin-top:14px"><label class="ctl"><span>Recording (wav, mp3, m4a, ogg; the first 2 minutes are analysed)</span><input id="file" type="file" accept="audio/*"></label><span id="fileSt" role="status"></span></div>
+    <div id="pTest" hidden style="margin-top:14px"><div class="grid">
+      <div class="ctl"><span>Waveform</span><select id="tShape"><option value="sine">Sine</option><option value="saw">Sawtooth</option><option value="odd">Odd harmonics (clarinet-like)</option><option value="missing">Missing fundamental</option><option value="pulse">Narrow pulses</option></select></div>
+      <div class="ctl"><span>Note</span><select id="tNote"></select></div>
+      <label class="ctl"><span class="v"><span>Detune</span><span id="vTc">+14 cents</span></span><input id="tCents" type="range" min="-50" max="50" step="1" value="14"></label>
+      <label class="ctl"><span class="v"><span>Vibrato depth</span><span id="vTv">0 cents</span></span><input id="tVib" type="range" min="0" max="50" step="1" value="0"></label>
+      <label class="ctl"><span class="v"><span>Noise</span><span id="vTn">-40 dB</span></span><input id="tNoise" type="range" min="-60" max="-5" step="1" value="-40"></label></div>
+      <div class="row" style="margin-top:12px"><button id="tGo" class="primary">Measure and play</button><button id="tStop">Stop</button><span id="tSt" role="status"></span></div></div>
+  </section>
+
+  <section class="panel" aria-label="Settings">
+    <h2>Settings</h2>
+    <div class="grid">
+      <label class="ctl"><span class="v"><span>Reference A4</span><span id="vA4">440.0 Hz</span></span><input id="a4" type="range" min="415" max="466" step="0.5" value="440"></label>
+      <div class="ctl"><span>Instrument range</span><select id="range"><option value="40,500">Bass, cello (40 to 500 Hz)</option><option value="70,1100" selected>Voice, guitar (70 to 1100 Hz)</option><option value="180,2600">Violin, flute (180 to 2600 Hz)</option><option value="40,2500">Everything (40 to 2500 Hz)</option></select></div>
+      <label class="ctl"><span class="v"><span>Strictness</span><span id="vTh">0.12</span></span><input id="th" type="range" min="0.05" max="0.25" step="0.01" value="0.12"></label>
+    </div>
+    <p class="note">The range sets the analysis window (three periods of its lowest pitch): a lower range is steadier on low notes but reacts more slowly and smooths fast vibrato. Strictness is the YIN threshold: lower rejects noisy frames, higher accepts them.</p>
+  </section>
+
+  <section class="panel scope" aria-label="Trace">
+    <div class="scope-head"><span><b>Pitch trace</b> semitones, lines at note centres</span><span id="hdTr"></span></div>
+    <canvas id="trace" role="img" aria-label="Pitch trace over time against note lines" style="height:230px"></canvas>
+  </section>
+
+  <section class="panel" aria-label="Statistics">
+    <h2>Statistics</h2>
+    <div class="big"><div><b id="sMed">--</b><span>median offset, cents</span></div><div><b id="sSd">--</b><span>spread (rms), cents</span></div><div><b id="sVo">--</b><span>voiced frames, %</span></div><div><b id="sA4">--</b><span>tuned to A4 =, Hz</span></div></div>
+    <canvas id="hist" role="img" aria-label="Histogram of how far each confident frame is from the nearest note, in cents" style="height:130px;margin-top:12px"></canvas>
+    <p class="note" id="statNote">Live: the last 5 seconds. Recording and test instrument: the whole analysis. The tuned-to estimate (peak of the histogram of distances from the nearest note) needs notes from a range of pitches and is only defined to within half a semitone of the reference: a recording tuned a whole semitone away looks identical.</p>
+  </section>
+
+  <section class="panel" aria-label="Reference tone">
+    <h2>Reference tone</h2>
+    <div class="grid"><div class="ctl"><span>Note</span><select id="rNote"></select></div><div class="ctl"><span>Waveform</span><select id="rShape"><option value="sine">Sine</option><option value="sawtooth">Sawtooth</option><option value="triangle">Triangle</option></select></div></div>
+    <div class="row" style="margin-top:12px"><button id="rPlay">Play reference</button><button id="rStop">Stop</button></div>
+    <p class="note">The reference follows the A4 setting above, in equal temperament.</p>
+  </section>
+
+  <section class="panel" aria-label="Self test">
+    <h2>Self test</h2>
+    <p class="note" style="margin-top:0">Runs ten signals of known pitch (sines from 82 Hz to 2 kHz, rich and missing-fundamental sounds, a noisy sawtooth) through the same tracker and compares.</p>
+    <div class="row"><button id="stGo">Run self test</button><span id="stSt" role="status"></span></div>
+    <div class="tw"><table aria-label="Self test results"><thead><tr><th>Signal</th><th>Want Hz</th><th>Got Hz</th><th>Error cents</th><th></th></tr></thead><tbody id="stTb"></tbody></table></div>
+  </section>
+
+  <section class="panel" aria-label="Method and sources">
+    <h2>Method and honest notes</h2>
+    <div class="two">
+      <div><p class="note" style="margin-top:0">YIN looks for the lag at which the signal best matches a copy of itself, using a difference function normalised by its running average so that low lags are not favoured, takes the first dip below the threshold, and interpolates between samples. Here the interpolation fits a cosine through three points, which stays accurate at high pitch where the usual parabola is biased. Note names use equal temperament: semitones = 12 log2(f / A4), and cents are hundredths of a semitone.</p>
+      <p class="note"><b>What this is not.</b> It is a monophonic tracker: chords and several notes at once give nonsense. The accuracy shown by the self test is on clean synthetic signals; real instruments drift, have inharmonic partials (piano, guitar bass strings) and room noise, and a real microphone or sound card can have its own sample-rate error. Nobody has checked this against a hardware tuner.</p></div>
+      <div><ul class="cites">
+        <li><cite>de Cheveign&eacute;, A., and Kawahara, H. (2002). YIN, a fundamental frequency estimator for speech and music. Journal of the Acoustical Society of America, 111(4).</cite></li>
+        <li><cite>Equal temperament and cents: standard; A4 = 440 Hz is the ISO 16 concert pitch.</cite></li>
+      </ul><p class="note">Both from memory, not re-checked.</p></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/*DSP*/
+</script>
+<script>
+/*PITCH*/
+</script>
+<script>
+(function () {
+  "use strict";
+  const P = window.PitchRuler, $ = (id) => document.getElementById(id);
+  const S = { src: "mic", a4: 440, ctx: null, stream: null, an: null, raf: 0, hist: [], trace: null, osc: null, play: null, live: false, frames: 0, last: null, lastUi: 0 };
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#888";
+  const fmt = (v, d) => (v == null || !isFinite(v) ? "--" : (v > 0 && d != null ? "+" : "") + v.toFixed(d == null ? 1 : d));
+  const sgn = (v, d) => (v == null || !isFinite(v) ? "--" : (v >= 0 ? "+" : "") + v.toFixed(d));
+  const NOTE_OPTS = []; for (let m = 36; m <= 96; m++) NOTE_OPTS.push(m);
+  const nName = (m) => P.NAMES[m % 12] + (Math.floor(m / 12) - 1);
+  ["tNote", "rNote"].forEach((id) => { const el = $(id); NOTE_OPTS.forEach((m) => el.add(new Option(nName(m), m))); el.value = 69; });
+  function range() { const [a, b] = $("range").value.split(",").map(Number); return { fmin: a, fmax: b, thresh: +$("th").value }; }
+  function labels() { $("vA4").textContent = (+$("a4").value).toFixed(1) + " Hz"; $("vTh").textContent = (+$("th").value).toFixed(2); $("vTc").textContent = sgn(+$("tCents").value, 0) + " cents"; $("vTv").textContent = $("tVib").value + " cents"; $("vTn").textContent = $("tNoise").value + " dB"; S.a4 = +$("a4").value; }
+  ["a4", "th", "tCents", "tVib", "tNoise", "range"].forEach((id) => $(id).addEventListener("input", () => { labels(); if (S.trace && S.src !== "mic") redoTrace(); }));
+  function setSrc(s) { S.src = s; [["sMic", "mic"], ["sFile", "file"], ["sTest", "test"]].forEach(([id, v]) => $(id).setAttribute("aria-pressed", String(v === s))); $("pMic").hidden = s !== "mic"; $("pFile").hidden = s !== "file"; $("pTest").hidden = s !== "test"; }
+  $("sMic").onclick = () => setSrc("mic"); $("sFile").onclick = () => setSrc("file"); $("sTest").onclick = () => setSrc("test");
+
+  function setCanvas(cv) { const dpr = Math.min(2, window.devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.fillStyle = css("--panel"); g.fillRect(0, 0, W, H); return { g, W, H }; }
+  function drawRuler(c) {
+    const { g, W, H } = setCanvas($("ruler")), L = 14, R = 14, pw = W - L - R, X = (v) => L + pw * (v + 50) / 100, y = H / 2 + 6;
+    g.fillStyle = css("--accent"); g.globalAlpha = 0.18; g.fillRect(X(-5), 6, X(5) - X(-5), H - 24); g.globalAlpha = 1; g.strokeStyle = css("--line"); g.fillStyle = css("--mute"); g.font = "11px " + css("--f-mono"); g.lineWidth = 1;
+    for (let v = -50; v <= 50; v += 5) { const big = v % 10 === 0, h = big ? 14 : 8; g.beginPath(); g.moveTo(X(v), y - h / 2 + 4); g.lineTo(X(v), y + h / 2 + 4); g.strokeStyle = v === 0 ? css("--ink") : css("--mute"); g.lineWidth = v === 0 ? 2 : 1; g.stroke(); if (v % 25 === 0) g.fillText((v > 0 ? "+" : "") + v, X(v) - 8, H - 3); }
+    if (c != null && isFinite(c)) { const x = X(Math.max(-50, Math.min(50, c))); g.fillStyle = Math.abs(c) <= 5 ? css("--accent") : css("--lamp"); g.beginPath(); g.moveTo(x, 8); g.lineTo(x - 8, 30); g.lineTo(x + 8, 30); g.closePath(); g.fill(); g.fillRect(x - 1.5, 30, 3, 26); }
+  }
+  function showNow(f0, clarity) {
+    if (f0 > 0) { const n = P.noteOf(f0, S.a4); $("nm").textContent = n.name + n.octave; $("cents").textContent = sgn(n.cents, 1); $("hz").textContent = f0.toFixed(2); $("tag").textContent = Math.abs(n.cents) <= 5 ? "in tune" : n.cents > 0 ? "sharp" : "flat"; $("tag").className = Math.abs(n.cents) <= 5 ? "ok" : ""; $("clar").textContent = "clarity " + clarity.toFixed(2); drawRuler(n.cents); }
+    else { $("nm").textContent = "--"; $("cents").textContent = "--"; $("hz").textContent = "--"; $("tag").textContent = ""; $("clar").textContent = "no clear pitch"; drawRuler(null); }
+  }
+  // ---- trace and statistics -------------------------------------------------------------------------
+  function drawTrace(t, f0, clar) {
+    const { g, W, H } = setCanvas($("trace")), L = 40, R = 8, Tp = 8, Bt = 20, pw = W - L - R, ph = H - Tp - Bt; g.font = "11px " + css("--f-mono"); const v = []; for (let i = 0; i < f0.length; i++) if (f0[i] > 0) v.push(P.noteOf(f0[i], S.a4).exact);
+    if (v.length < 2) { g.fillStyle = css("--mute"); g.fillText("No pitched sound yet.", L, H / 2); return; }
+    const sorted = v.slice().sort((a, b) => a - b), med = sorted[sorted.length >> 1]; let lo = Math.floor(sorted[Math.floor(sorted.length * 0.02)] - 0.6), hi = Math.ceil(sorted[Math.floor(sorted.length * 0.98)] + 0.6); if (hi - lo < 5) { lo = Math.floor(med - 2.5); hi = lo + 5; } if (hi - lo > 40) { lo = Math.floor(med - 20); hi = lo + 40; }
+    const t0 = t[0], t1 = t[t.length - 1] || t0 + 1, X = (x) => L + pw * (x - t0) / Math.max(0.5, t1 - t0), Y = (m) => Tp + ph * (1 - (m - lo) / (hi - lo)); g.lineWidth = 1;
+    for (let m = lo; m <= hi; m++) { g.strokeStyle = css("--line"); g.beginPath(); g.moveTo(L, Y(m)); g.lineTo(W - R, Y(m)); g.stroke(); if (hi - lo <= 24 || m % 12 === 0) { g.fillStyle = css("--mute"); g.fillText(nName(m).replace("\u266f", "#"), 4, Y(m) + 4); } }
+    for (let i = 0; i < f0.length; i++) if (f0[i] > 0) { const e = P.noteOf(f0[i], S.a4); g.fillStyle = Math.abs(e.cents) <= 5 ? css("--accent") : css("--ink"); g.globalAlpha = Math.min(1, 0.25 + clar[i]); g.fillRect(X(t[i]) - 1.2, Y(e.exact) - 1.2, 2.4, 2.4); } g.globalAlpha = 1;
+    g.fillStyle = css("--mute"); g.fillText(`${(t1 - t0).toFixed(1)} s`, W - R - 40, H - 5);
+  }
+  function stats(f0, clar, nVoicedDen) {
+    const cs = []; for (let i = 0; i < f0.length; i++) if (f0[i] > 0 && clar[i] >= 0.85) cs.push(P.noteOf(f0[i], S.a4).cents);
+    const voiced = f0.filter((v) => v > 0).length; $("sVo").textContent = f0.length ? (100 * voiced / f0.length).toFixed(0) : "--";
+    const est = P.tuningOffset(f0, clar, S.a4); $("sA4").textContent = est ? est.a4.toFixed(2) : "--"; $("sMed").textContent = est ? sgn(est.cents, 1) : (cs.length ? sgn(cs.slice().sort((a, b) => a - b)[cs.length >> 1], 1) : "--"); $("sSd").textContent = est ? est.spread.toFixed(1) : "--";
+    const h = P.foldHistogram(f0, clar, S.a4), { g, W, H } = setCanvas($("hist")), L = 8, R = 8, pw = W - L - R; let mx = 1; for (const b of h.bins) mx = Math.max(mx, b); g.fillStyle = css("--accent"); for (let i = 0; i < 50; i++) { const bh = (H - 24) * h.bins[i] / mx; g.fillRect(L + pw * i / 50 + 1, H - 18 - bh, pw / 50 - 2, bh); }
+    g.fillStyle = css("--mute"); g.font = "11px " + css("--f-mono"); g.fillText("-50", L, H - 4); g.fillText("0", L + pw / 2 - 3, H - 4); g.fillText("+50 cents from the nearest note", W - R - 190, H - 4); g.strokeStyle = css("--ink"); g.beginPath(); g.moveTo(L + pw / 2, 4); g.lineTo(L + pw / 2, H - 18); g.stroke();
+    return est;
+  }
+  // ---- microphone ---------------------------------------------------------------------------------
+  async function getCtx() { if (!S.ctx) S.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (S.ctx.state === "suspended") await S.ctx.resume(); return S.ctx; }
+  $("micGo").onclick = async () => {
+    stopMic(); try { const ctx = await getCtx(); S.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+    catch (e) { $("micSt").textContent = "Microphone is not available in this view. Use a recording or the test instrument, or open the standalone page."; return; }
+    const ctx = S.ctx, src = ctx.createMediaStreamSource(S.stream), an = ctx.createAnalyser(); an.fftSize = 8192; an.smoothingTimeConstant = 0; src.connect(an); S.an = an; S.live = true; S.hist = []; S.t0 = performance.now(); $("micSt").textContent = "listening"; $("srcInfo").textContent = `microphone, ${ctx.sampleRate} Hz`;
+    const buf = new Float32Array(8192); const tick = () => { if (!S.live) return; an.getFloatTimeDomainData(buf); const o = range(), N = Math.min(8192, Math.round(3 * ctx.sampleRate / o.fmin)), r = P.yin(buf.subarray(8192 - N), ctx.sampleRate, o), t = (performance.now() - S.t0) / 1000; S.hist.push({ t, f0: r.f0, clarity: r.clarity }); while (S.hist.length && t - S.hist[0].t > 10) S.hist.shift(); S.frames++;
+      const recent = S.hist.slice(-5).filter((h) => h.f0 > 0).map((h) => h.f0).sort((a, b) => a - b), f = recent.length >= 3 ? recent[recent.length >> 1] : 0; S.last = { f0: f, clarity: r.clarity, raw: r.f0 };
+      if (t - S.lastUi > 0.09) { S.lastUi = t; showNow(f, r.clarity); const h = S.hist; drawTrace(h.map((x) => x.t), h.map((x) => x.f0), h.map((x) => x.clarity)); const w = h.filter((x) => t - x.t <= 5); stats(w.map((x) => x.f0), w.map((x) => x.clarity)); $("hdTr").textContent = "last 10 s"; }
+      S.raf = requestAnimationFrame(tick); }; S.raf = requestAnimationFrame(tick);
+  };
+  function stopMic() { S.live = false; cancelAnimationFrame(S.raf); if (S.stream) { S.stream.getTracks().forEach((t) => t.stop()); S.stream = null; } $("micSt").textContent = ""; }
+  $("micStop").onclick = stopMic;
+  // ---- recordings and the test instrument -------------------------------------------------------------
+  function analyze(x, sr, label) { const o = range(); S.trace = { x, sr, label }; const t = P.track(x, sr, Object.assign({ hop: 0.01 }, o)); S.trace.t = t; showTrace(t); return t; }
+  function showTrace(t) { drawTrace(t.t, t.f0, t.clarity); const est = stats(t.f0, t.clarity); $("hdTr").textContent = S.trace.label; const vv = []; for (let i = 0; i < t.f0.length; i++) if (t.f0[i] > 0 && t.clarity[i] >= 0.85) vv.push(t.f0[i]); if (vv.length) { const m = vv.sort((a, b) => a - b)[vv.length >> 1]; showNow(m, 1); } else showNow(0, 0); return est; }
+  function redoTrace() { if (!S.trace) return; const t = P.track(S.trace.x, S.trace.sr, Object.assign({ hop: 0.01 }, range())); S.trace.t = t; showTrace(t); }
+  $("file").onchange = async () => { const f = $("file").files[0]; if (!f) return; $("fileSt").textContent = "decoding..."; try { const ctx = await getCtx(), b = await ctx.decodeAudioData(await f.arrayBuffer()), x = Float64Array.from(b.getChannelData(0).subarray(0, Math.round(120 * b.sampleRate))); $("fileSt").textContent = "analysing..."; await new Promise((q) => setTimeout(q, 20)); const t0 = performance.now(); analyze(x, b.sampleRate, f.name + ", " + (x.length / b.sampleRate).toFixed(0) + " s"); $("fileSt").textContent = `done in ${(performance.now() - t0).toFixed(0)} ms`; $("srcInfo").textContent = f.name; } catch (e) { $("fileSt").textContent = "Could not read that file."; } };
+  async function runTest() {
+    const m = +$("tNote").value, c = +$("tCents").value, a4 = S.a4, f = P.hz(m, a4), spec = { f0: f, cents: c, shape: $("tShape").value, vibCents: +$("tVib").value, noiseDb: +$("tNoise").value, dur: 3 }, sr = 44100, { x } = P.synth(spec, sr);
+    const t = analyze(x, sr, "test instrument, 3 s"); $("srcInfo").textContent = `commanded ${nName(m)} ${sgn(c, 1)} cents against A4 = ${a4.toFixed(1)} Hz`;
+    const v = []; t.f0.forEach((q, i) => { if (q > 0 && t.t[i] > 0.3 && t.t[i] < 2.7 && t.clarity[i] > 0.85) v.push(q); }); const med = v.sort((a, b) => a - b)[v.length >> 1], meas = med ? P.noteOf(med, a4) : null;
+    S.testResult = med ? { commanded: c, measured: meas.cents, err: meas.cents - c, midi: meas.midi, wantMidi: m } : null; $("tSt").textContent = med ? `measured ${sgn(meas.cents, 2)} cents on ${nName(meas.midi)}, error ${sgn(meas.cents - c, 2)} cents` : "no pitch found (try a lower noise level)";
+    const ctx = await getCtx(); stopPlay(); const b = ctx.createBuffer(1, x.length, sr); const ch = b.getChannelData(0); for (let i = 0; i < x.length; i++) ch[i] = x[i] * 0.5; const s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(); S.play = s;
+  }
+  $("tGo").onclick = runTest; function stopPlay() { if (S.play) { try { S.play.stop(); } catch (e) {} S.play = null; } } $("tStop").onclick = stopPlay;
+  // ---- reference tone and self test ------------------------------------------------------------------
+  $("rPlay").onclick = async () => { const ctx = await getCtx(); stopRef(); const o = ctx.createOscillator(), g = ctx.createGain(); o.type = $("rShape").value; o.frequency.value = P.hz(+$("rNote").value, S.a4); g.gain.value = 0.2; o.connect(g); g.connect(ctx.destination); o.start(); S.osc = o; };
+  function stopRef() { if (S.osc) { try { S.osc.stop(); } catch (e) {} S.osc = null; } } $("rStop").onclick = stopRef;
+  $("stGo").onclick = async () => { $("stSt").textContent = "running..."; await new Promise((q) => setTimeout(q, 30)); const rows = P.selfTest(44100); $("stTb").innerHTML = rows.map((r) => `<tr><td>${r.name}</td><td>${r.want.toFixed(2)}</td><td>${r.got.toFixed(2)}</td><td>${sgn(r.err, 2)}</td><td>${r.pass ? "ok" : "FAIL"}</td></tr>`).join(""); S.selfTest = rows; $("stSt").textContent = rows.every((r) => r.pass) ? "all passed" : "some failed"; };
+  window.addEventListener("resize", () => { drawRuler(null); if (S.trace && S.trace.t) showTrace(S.trace.t); });
+  labels(); drawRuler(null); drawTrace([], [], []); stats([], []);
+  window.__pr = { S, P, runTest, analyze, range, ready: () => 1 };
+})();
+</script>

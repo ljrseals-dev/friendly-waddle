@@ -1,0 +1,414 @@
+<!doctype html>
+<title>Pitch Ruler</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: the ruler is the instrument face; source and settings beneath, trace and statistics below. */
+  :root {
+    --bg: #e9eef0; --panel: #f6f9fa; --ink: #13222b; --mute: #55666f; --line: #c3d0d6; --accent: #0a5f86; --accent-ink: #ffffff; --lamp: #b25e00;
+    --f-display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+    --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #0d1519; --panel: #141f25; --ink: #dbe6ea; --mute: #8ea3ac; --line: #28383f; --accent: #f0b447; --accent-ink: #1a1203; --lamp: #f0b447; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #0d1519; --panel: #141f25; --ink: #dbe6ea; --mute: #8ea3ac; --line: #28383f; --accent: #f0b447; --accent-ink: #1a1203; --lamp: #f0b447; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); padding-block: 20px 48px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  main { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; }
+  h1 { font: 700 clamp(34px, 7vw, 54px)/0.95 var(--f-display); margin: 0; text-transform: uppercase; text-wrap: balance; }
+  h2 { font: 600 13px/1 var(--f-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); margin: 0 0 12px; }
+  .sub { color: var(--mute); margin: 8px 0 0; max-width: 64ch; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; min-width: 0; }
+  .scope { padding: 0; overflow: hidden; }
+  .scope-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; padding: 10px 16px; border-bottom: 1px solid var(--line); font: 12px var(--f-mono); color: var(--mute); }
+  .scope-head b { color: var(--ink); font-weight: 500; }
+  canvas { display: block; width: 100%; height: 200px; }
+  canvas + .scope-head { border-top: 1px solid var(--line); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button, select, input[type=file]::file-selector-button { font: 500 14px var(--f-body); border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 4px; padding: 9px 14px; cursor: pointer; }
+  button:hover, select:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button[aria-pressed=true] { outline: 2px solid var(--accent); outline-offset: 1px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px 24px; }
+  label.ctl, .ctl { display: grid; gap: 4px; font-size: 13px; color: var(--mute); }
+  .ctl .v { font: 13px var(--f-mono); color: var(--ink); display: flex; justify-content: space-between; gap: 8px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .size { display: grid; gap: 6px; }
+  .size .ends { display: flex; justify-content: space-between; font: 12px var(--f-mono); color: var(--mute); }
+  .size input { height: 28px; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--ink); }
+  .note { font-size: 12.5px; color: var(--mute); }
+  #status { font: 12px var(--f-mono); color: var(--mute); min-height: 18px; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .two > div { min-width: 0; }
+  ul.cites { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 14px; }
+  cite { font-style: normal; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  table { width: 100%; border-collapse: collapse; font: 13px var(--f-mono); }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--mute); font-weight: 500; }
+  .tw { overflow-x: auto; }
+  .big { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+  .big div { border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; }
+  .big b { display: block; font: 600 26px/1.1 var(--f-display); }
+  .big span { font: 12px var(--f-mono); color: var(--mute); }
+  .warn { color: var(--lamp); font-size: 13px; min-height: 18px; }
+  .note-big { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; padding: 4px 2px 0; }
+  .note-big .nm { font: 700 76px/1 var(--f-display); min-width: 2.2ch; }
+  .note-big .rd { font: 500 20px var(--f-mono); color: var(--mute); }
+  .note-big .rd b { color: var(--ink); font-weight: 500; }
+  .note-big .ok { color: var(--accent); }
+  .seg { display: flex; flex-wrap: wrap; gap: 8px; }
+</style>
+<main>
+  <header>
+    <h1>Pitch Ruler</h1>
+    <p class="sub">A tuner you can check. It tracks pitch with the YIN method, names the note, and shows how many cents sharp or flat you are against a reference you choose. It listens live, analyses a recording (and estimates what A4 the recording was tuned to), or measures a virtual instrument whose true pitch it knows, so you can see for yourself how accurate it is.</p>
+  </header>
+
+  <section class="panel scope" aria-label="Ruler">
+    <div class="note-big" aria-live="polite"><span class="nm" id="nm">--</span><span class="rd"><b id="cents">--</b> cents &nbsp; <b id="hz">--</b> Hz &nbsp; <span id="tag"></span></span></div>
+    <canvas id="ruler" role="img" aria-label="Ruler from minus 50 to plus 50 cents with a needle at the current deviation" style="height:86px"></canvas>
+    <div class="scope-head"><span id="srcInfo">choose a source below</span><span id="clar"></span></div>
+  </section>
+
+  <section class="panel" aria-label="Source">
+    <h2>Source</h2>
+    <div class="seg" role="group" aria-label="Source"><button id="sMic" aria-pressed="true">Microphone</button><button id="sFile" aria-pressed="false">Recording</button><button id="sTest" aria-pressed="false">Test instrument</button></div>
+    <div id="pMic" style="margin-top:14px"><div class="row"><button id="micGo" class="primary">Start listening</button><button id="micStop">Stop</button><span id="micSt" role="status"></span></div>
+      <p class="note">Browser echo cancellation, noise suppression and automatic gain are switched off where the browser allows it. Wear headphones if a reference tone is playing.</p></div>
+    <div id="pFile" hidden style="margin-top:14px"><label class="ctl"><span>Recording (wav, mp3, m4a, ogg; the first 2 minutes are analysed)</span><input id="file" type="file" accept="audio/*"></label><span id="fileSt" role="status"></span></div>
+    <div id="pTest" hidden style="margin-top:14px"><div class="grid">
+      <div class="ctl"><span>Waveform</span><select id="tShape"><option value="sine">Sine</option><option value="saw">Sawtooth</option><option value="odd">Odd harmonics (clarinet-like)</option><option value="missing">Missing fundamental</option><option value="pulse">Narrow pulses</option></select></div>
+      <div class="ctl"><span>Note</span><select id="tNote"></select></div>
+      <label class="ctl"><span class="v"><span>Detune</span><span id="vTc">+14 cents</span></span><input id="tCents" type="range" min="-50" max="50" step="1" value="14"></label>
+      <label class="ctl"><span class="v"><span>Vibrato depth</span><span id="vTv">0 cents</span></span><input id="tVib" type="range" min="0" max="50" step="1" value="0"></label>
+      <label class="ctl"><span class="v"><span>Noise</span><span id="vTn">-40 dB</span></span><input id="tNoise" type="range" min="-60" max="-5" step="1" value="-40"></label></div>
+      <div class="row" style="margin-top:12px"><button id="tGo" class="primary">Measure and play</button><button id="tStop">Stop</button><span id="tSt" role="status"></span></div></div>
+  </section>
+
+  <section class="panel" aria-label="Settings">
+    <h2>Settings</h2>
+    <div class="grid">
+      <label class="ctl"><span class="v"><span>Reference A4</span><span id="vA4">440.0 Hz</span></span><input id="a4" type="range" min="415" max="466" step="0.5" value="440"></label>
+      <div class="ctl"><span>Instrument range</span><select id="range"><option value="40,500">Bass, cello (40 to 500 Hz)</option><option value="70,1100" selected>Voice, guitar (70 to 1100 Hz)</option><option value="180,2600">Violin, flute (180 to 2600 Hz)</option><option value="40,2500">Everything (40 to 2500 Hz)</option></select></div>
+      <label class="ctl"><span class="v"><span>Strictness</span><span id="vTh">0.12</span></span><input id="th" type="range" min="0.05" max="0.25" step="0.01" value="0.12"></label>
+    </div>
+    <p class="note">The range sets the analysis window (three periods of its lowest pitch): a lower range is steadier on low notes but reacts more slowly and smooths fast vibrato. Strictness is the YIN threshold: lower rejects noisy frames, higher accepts them.</p>
+  </section>
+
+  <section class="panel scope" aria-label="Trace">
+    <div class="scope-head"><span><b>Pitch trace</b> semitones, lines at note centres</span><span id="hdTr"></span></div>
+    <canvas id="trace" role="img" aria-label="Pitch trace over time against note lines" style="height:230px"></canvas>
+  </section>
+
+  <section class="panel" aria-label="Statistics">
+    <h2>Statistics</h2>
+    <div class="big"><div><b id="sMed">--</b><span>median offset, cents</span></div><div><b id="sSd">--</b><span>spread (rms), cents</span></div><div><b id="sVo">--</b><span>voiced frames, %</span></div><div><b id="sA4">--</b><span>tuned to A4 =, Hz</span></div></div>
+    <canvas id="hist" role="img" aria-label="Histogram of how far each confident frame is from the nearest note, in cents" style="height:130px;margin-top:12px"></canvas>
+    <p class="note" id="statNote">Live: the last 5 seconds. Recording and test instrument: the whole analysis. The tuned-to estimate (peak of the histogram of distances from the nearest note) needs notes from a range of pitches and is only defined to within half a semitone of the reference: a recording tuned a whole semitone away looks identical.</p>
+  </section>
+
+  <section class="panel" aria-label="Reference tone">
+    <h2>Reference tone</h2>
+    <div class="grid"><div class="ctl"><span>Note</span><select id="rNote"></select></div><div class="ctl"><span>Waveform</span><select id="rShape"><option value="sine">Sine</option><option value="sawtooth">Sawtooth</option><option value="triangle">Triangle</option></select></div></div>
+    <div class="row" style="margin-top:12px"><button id="rPlay">Play reference</button><button id="rStop">Stop</button></div>
+    <p class="note">The reference follows the A4 setting above, in equal temperament.</p>
+  </section>
+
+  <section class="panel" aria-label="Self test">
+    <h2>Self test</h2>
+    <p class="note" style="margin-top:0">Runs ten signals of known pitch (sines from 82 Hz to 2 kHz, rich and missing-fundamental sounds, a noisy sawtooth) through the same tracker and compares.</p>
+    <div class="row"><button id="stGo">Run self test</button><span id="stSt" role="status"></span></div>
+    <div class="tw"><table aria-label="Self test results"><thead><tr><th>Signal</th><th>Want Hz</th><th>Got Hz</th><th>Error cents</th><th></th></tr></thead><tbody id="stTb"></tbody></table></div>
+  </section>
+
+  <section class="panel" aria-label="Method and sources">
+    <h2>Method and honest notes</h2>
+    <div class="two">
+      <div><p class="note" style="margin-top:0">YIN looks for the lag at which the signal best matches a copy of itself, using a difference function normalised by its running average so that low lags are not favoured, takes the first dip below the threshold, and interpolates between samples. Here the interpolation fits a cosine through three points, which stays accurate at high pitch where the usual parabola is biased. Note names use equal temperament: semitones = 12 log2(f / A4), and cents are hundredths of a semitone.</p>
+      <p class="note"><b>What this is not.</b> It is a monophonic tracker: chords and several notes at once give nonsense. The accuracy shown by the self test is on clean synthetic signals; real instruments drift, have inharmonic partials (piano, guitar bass strings) and room noise, and a real microphone or sound card can have its own sample-rate error. Nobody has checked this against a hardware tuner.</p></div>
+      <div><ul class="cites">
+        <li><cite>de Cheveign&eacute;, A., and Kawahara, H. (2002). YIN, a fundamental frequency estimator for speech and music. Journal of the Acoustical Society of America, 111(4).</cite></li>
+        <li><cite>Equal temperament and cents: standard; A4 = 440 Hz is the ISO 16 concert pitch.</cite></li>
+      </ul><p class="note">Both from memory, not re-checked.</p></div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* Sweep Capture core: exponential sine sweep, inverse filter, deconvolution, room-acoustic metrics. No DOM, no Web Audio. */
+(function (g) {
+  "use strict";
+  /** In-place iterative radix-2 complex FFT. re, im: Float64Array of power-of-two length. inverse scales by 1/n. */
+  function fft(re, im, inverse) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+    for (let len = 2; len <= n; len <<= 1) {
+      const ang = (2 * Math.PI / len) * (inverse ? 1 : -1), wr = Math.cos(ang), wi = Math.sin(ang), h = len >> 1;
+      for (let i = 0; i < n; i += len) { let cr = 1, ci = 0; for (let k = 0; k < h; k++) {
+        const a = i + k, b = a + h, xr = re[b] * cr - im[b] * ci, xi = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+        const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t; } }
+    }
+    if (inverse) for (let i = 0; i < n; i++) { re[i] /= n; im[i] /= n; }
+  }
+  const pow2 = (n) => { let p = 1; while (p < n) p <<= 1; return p; };
+  /** Linear convolution by FFT. */
+  function convolve(a, b) {
+    const n = pow2(a.length + b.length - 1), ar = new Float64Array(n), ai = new Float64Array(n), br = new Float64Array(n), bi = new Float64Array(n);
+    ar.set(a); br.set(b); fft(ar, ai, false); fft(br, bi, false);
+    for (let i = 0; i < n; i++) { const r = ar[i] * br[i] - ai[i] * bi[i]; ai[i] = ar[i] * bi[i] + ai[i] * br[i]; ar[i] = r; }
+    fft(ar, ai, true); return ar.subarray(0, a.length + b.length - 1);
+  }
+
+  /** Exponential sine sweep (Farina 2000), f1 to f2 over T seconds, with short raised-cosine fades. */
+  function sweep(f1, f2, T, sr, fade) {
+    const N = Math.round(T * sr), x = new Float64Array(N), L = T / Math.log(f2 / f1), K = 2 * Math.PI * f1 * L, nf = Math.round((fade == null ? 0.02 : fade) * sr);
+    for (let i = 0; i < N; i++) { const t = i / sr; let v = Math.sin(K * (Math.exp(t / L) - 1)); if (i < nf) v *= 0.5 - 0.5 * Math.cos(Math.PI * i / nf); if (i >= N - nf) v *= 0.5 - 0.5 * Math.cos(Math.PI * (N - 1 - i) / nf); x[i] = v; }
+    return x;
+  }
+  /** Inverse filter: the sweep reversed in time with a -6 dB/octave amplitude slope, so that sweep convolved with it is a band-limited impulse. */
+  function inverse(f1, f2, T, sr, fade) {
+    const x = sweep(f1, f2, T, sr, fade), N = x.length, L = T / Math.log(f2 / f1), inv = new Float64Array(N);
+    for (let i = 0; i < N; i++) inv[i] = x[N - 1 - i] * Math.exp(-(i / sr) / L);
+    return inv;
+  }
+  /**
+   * Deconvolve a recording y of the sweep into the impulse response. Returns { ir (linear response, starting 3 ms before the main peak),
+   * full (whole deconvolution), peak (index of main peak in full), lat (peak minus the ideal position, in seconds: the system latency), h2 (second-harmonic level, dB) }.
+   */
+  function deconvolve(y, f1, f2, T, sr, fade) {
+    const x = sweep(f1, f2, T, sr, fade), inv = inverse(f1, f2, T, sr, fade), ref = convolve(x, inv);
+    let rp = 0, rm = 0; for (let i = 0; i < ref.length; i++) if (Math.abs(ref[i]) > rm) { rm = Math.abs(ref[i]); rp = i; }
+    const full = convolve(y, inv); for (let i = 0; i < full.length; i++) full[i] /= rm;
+    let pk = rp, pm = 0; for (let i = rp - 1; i < full.length; i++) if (i >= 0 && Math.abs(full[i]) > pm) { pm = Math.abs(full[i]); pk = i; }
+    const L = T / Math.log(f2 / f1) * sr, pre = Math.round(0.003 * sr), start = Math.max(0, pk - pre), ir = Float64Array.from(full.subarray(start));
+    // second harmonic arrives earlier than the linear response by L ln 2 samples; compare energies in 30 ms windows
+    const w = Math.round(0.03 * sr), h2c = pk - Math.round(L * Math.LN2); let e2 = 0, e1 = 0;
+    for (let i = 0; i < w; i++) { const a = h2c - (w >> 1) + i, b = pk - pre + i; if (a >= 0) e2 += full[a] * full[a]; if (b < full.length) e1 += full[b] * full[b]; }
+    return { ir, full, peak: pk, lat: (pk - rp) / sr, h2: 10 * Math.log10((e2 + 1e-30) / (e1 + 1e-30)) };
+  }
+
+  /** Schroeder backward integration, energy in dB relative to the total (0 dB at the start). */
+  function schroederDb(x) { const n = x.length, e = new Float64Array(n); let a = 0; for (let i = n - 1; i >= 0; i--) { a += x[i] * x[i]; e[i] = a; } const t = e[0] || 1e-30; for (let i = 0; i < n; i++) e[i] = 10 * Math.log10(e[i] / t + 1e-30); return e; }
+  /** Noise-floor aware truncation: the IR is cut where its 20 ms smoothed power first comes within 6 dB of the floor (median of the last 10%), and the floor power is subtracted. */
+  function cleanIR(x, sr) {
+    const n = x.length, tail = x.subarray(Math.floor(n * 0.9)), np = tail.reduce((s, v) => s + v * v, 0) / Math.max(1, tail.length), w = Math.max(8, Math.round(0.02 * sr));
+    let cut = n, acc = 0; const q = new Float64Array(n);
+    for (let i = 0; i < n; i++) { acc += x[i] * x[i]; if (i >= w) acc -= x[i - w] * x[i - w]; q[i] = acc / w; }
+    let pk = 0, pm = 0; for (let i = 0; i < n; i++) if (q[i] > pm) { pm = q[i]; pk = i; }
+    cut = pk + 1; for (let i = n - 1; i > pk; i--) if (q[i] > np * 4) { cut = i + 1; break; }   // last point above the floor, so a quiet gap before the dense tail does not truncate the response
+    const out = new Float64Array(cut); for (let i = 0; i < cut; i++) { const v = x[i], m = v * v - np; out[i] = m > 0 ? Math.sign(v) * Math.sqrt(m) : 0; }
+    return { ir: out, floorDb: 10 * Math.log10(np + 1e-30), dr: 10 * Math.log10(pm / (np + 1e-30)), cut: cut / sr };
+  }
+  /** Reverberation time from a straight-line fit of the Schroeder curve between hi and lo dB (negative numbers), extrapolated to 60 dB. null if the curve never reaches lo. */
+  function decayTime(x, sr, hi, lo) {
+    const e = schroederDb(x); let i1 = -1, i2 = -1; for (let i = 0; i < e.length; i++) { if (i1 < 0 && e[i] <= hi) i1 = i; if (e[i] <= lo) { i2 = i; break; } }
+    if (i1 < 0 || i2 <= i1 + 2) return null;
+    let sx = 0, sy = 0, sxx = 0, sxy = 0, m = 0; for (let i = i1; i <= i2; i++) { const t = i / sr; sx += t; sy += e[i]; sxx += t * t; sxy += t * e[i]; m++; }
+    const slope = (m * sxy - sx * sy) / (m * sxx - sx * sx); return slope < 0 ? -60 / slope : null;
+  }
+  /** Clarity C80 (dB) and definition D50 (0-1) from an IR whose first sample is the direct sound (the main peak sits at 3 ms; the window starts at the peak). */
+  function clarity(x, sr, ms, pre) {
+    let p = 0, m = 0; for (let i = 0; i < x.length; i++) if (Math.abs(x[i]) > m) { m = Math.abs(x[i]); p = i; }
+    const k = p + Math.round(ms * sr / 1000); let a = 0, b = 0; for (let i = p; i < x.length; i++) { const v = x[i] * x[i]; if (i < k) a += v; else b += v; }
+    return { c: 10 * Math.log10((a + 1e-30) / (b + 1e-30)), d: a / (a + b + 1e-30) };
+  }
+  /** RBJ band-pass (constant 0 dB peak), octave wide, run forward only. stages > 1 cascades it for steeper skirts (less leakage from neighbouring bands). */
+  function bandpass(x, sr, fc, stages) {
+    const w = 2 * Math.PI * fc / sr, al = Math.sin(w) / (2 * (1 / (2 * Math.sinh(Math.LN2 / 2 * 1 * w / Math.sin(w))))), c = Math.cos(w);
+    const b0 = al, b2 = -al, a0 = 1 + al, a1 = -2 * c, a2 = 1 - al; let src = x, y;
+    for (let st = 0; st < (stages || 1); st++) { y = new Float64Array(src.length); let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+      for (let i = 0; i < src.length; i++) { const v = (b0 * src[i] + b2 * x2 - a1 * y1 - a2 * y2) / a0; x2 = x1; x1 = src[i]; y2 = y1; y1 = v; y[i] = v; } src = y; }
+    return y;
+  }
+  const BANDS = [125, 250, 500, 1000, 2000, 4000];
+  /** Full report: broadband and octave-band T20, T30 (null when the dynamic range is too small), EDT, C80, D50, plus floor and dynamic range. */
+  function analyze(ir, sr) {
+    const one = (x) => {
+      const c = cleanIR(x, sr), t20 = decayTime(c.ir, sr, -5, -25), t30 = c.dr >= 40 ? decayTime(c.ir, sr, -5, -35) : null, edt = decayTime(c.ir, sr, 0, -10), cl = clarity(x, sr, 80);
+      return { t20, t30, edt, c80: cl.c, d50: clarity(x, sr, 50).d, dr: c.dr, floorDb: c.floorDb };
+    };
+    const out = { broad: one(ir), bands: {} }; for (const f of BANDS) if (f < sr / 2.5) out.bands[f] = one(bandpass(ir, sr, f, 2));
+    return out;
+  }
+  /** 24-bit PCM mono WAV. */
+  function wav24(x, sr, norm) {
+    let m = 0; for (let i = 0; i < x.length; i++) m = Math.max(m, Math.abs(x[i])); const k = norm && m > 0 ? 0.95 / m : 1, n = x.length, b = new ArrayBuffer(44 + n * 3), d = new DataView(b);
+    const s = (o, t) => { for (let i = 0; i < t.length; i++) d.setUint8(o + i, t.charCodeAt(i)); };
+    s(0, "RIFF"); d.setUint32(4, 36 + n * 3, true); s(8, "WAVE"); s(12, "fmt "); d.setUint32(16, 16, true); d.setUint16(20, 1, true); d.setUint16(22, 1, true); d.setUint32(24, sr, true); d.setUint32(28, sr * 3, true); d.setUint16(32, 3, true); d.setUint16(34, 24, true); s(36, "data"); d.setUint32(40, n * 3, true);
+    for (let i = 0; i < n; i++) { const v = Math.max(-1, Math.min(1, x[i] * k)), q = Math.round(v * 8388607); d.setUint8(44 + i * 3, q & 255); d.setUint8(45 + i * 3, (q >> 8) & 255); d.setUint8(46 + i * 3, (q >> 16) & 255); }
+    return b;
+  }
+  /** A synthetic room for demos and tests: direct sound plus an exponentially decaying noise tail with a known RT60. */
+  function syntheticRoom(sr, rt60, seed, delayMs) {
+    const n = Math.round(Math.min(rt60 * 1.4 + 0.2, 6) * sr), h = new Float64Array(n), d0 = Math.round((delayMs || 0) * sr / 1000); let s = seed >>> 0 || 1;
+    const rnd = () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296 * 2 - 1; };
+    const t0 = Math.round(0.012 * sr), a = Math.pow(10, -3 / rt60) ; // amplitude decays 60 dB over rt60: per-second factor 10^(-3/rt60)
+    h[d0] = 1; for (let i = t0; i < n - d0; i++) h[d0 + i] = 0.12 * rnd() * Math.pow(a, (i - t0) / sr); return h;
+  }
+  g.SweepCore = { fft, convolve, sweep, inverse, deconvolve, schroederDb, cleanIR, decayTime, clarity, bandpass, analyze, wav24, syntheticRoom, BANDS };
+  if (typeof module !== "undefined") module.exports = g.SweepCore;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+/* Pitch Ruler core: YIN pitch tracker (de Cheveigne and Kawahara 2002), note naming with cents, tuning-reference (A4) estimation, test-signal synthesis, built-in self test. */
+(function (g) {
+  "use strict";
+  const D = g.SweepCore || require("./dsp.js");
+  const NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+  /** Frequency to note: { midi (nearest), name, octave, cents (-50..50 from that note), exact (fractional midi) } relative to A4 = a4 Hz. */
+  function noteOf(f, a4) {
+    a4 = a4 || 440; const exact = 69 + 12 * Math.log2(f / a4), m = Math.round(exact); return { midi: m, name: NAMES[((m % 12) + 12) % 12], octave: Math.floor(m / 12) - 1, cents: 100 * (exact - m), exact };
+  }
+  const hz = (midi, a4) => (a4 || 440) * Math.pow(2, (midi - 69) / 12);
+  /**
+   * YIN on one frame. opts: fmin, fmax, thresh (default 0.12: dips of the normalised difference function below this count as the period), minRms.
+   * Returns { f0 (0 if unvoiced), clarity (1 - d'), rms }.
+   */
+  function yin(x, sr, opts) {
+    const o = Object.assign({ fmin: 50, fmax: 2000, thresh: 0.12, minRms: 0.002 }, opts || {}), n = x.length;
+    let e = 0; for (let i = 0; i < n; i++) e += x[i] * x[i]; const rms = Math.sqrt(e / n); if (rms < o.minRms) return { f0: 0, clarity: 0, rms };
+    const tauMax = Math.min(Math.floor(sr / o.fmin), Math.floor(n / 2) - 1), tauMin = Math.max(2, Math.floor(sr / o.fmax)), W = n - tauMax;
+    if (W < tauMax) return { f0: 0, clarity: 0, rms };
+    // d(tau) = e0 + e(tau) - 2 c(tau) with c from an FFT cross-correlation
+    const size = (() => { let p = 1; while (p < n + W) p <<= 1; return p; })(), ar = new Float64Array(size), ai = new Float64Array(size), br = new Float64Array(size), bi = new Float64Array(size);
+    for (let i = 0; i < W; i++) ar[i] = x[i]; for (let i = 0; i < n; i++) br[i] = x[i];
+    D.fft(ar, ai, false); D.fft(br, bi, false); for (let i = 0; i < size; i++) { const r = ar[i] * br[i] + ai[i] * bi[i], im = ar[i] * bi[i] - ai[i] * br[i]; ar[i] = r; ai[i] = im; } D.fft(ar, ai, true);   // conj(A) * B -> sum_j a_j b_{j+tau}
+    const pre = new Float64Array(n + 1); for (let i = 0; i < n; i++) pre[i + 1] = pre[i] + x[i] * x[i]; const e0 = pre[W], d = new Float64Array(tauMax + 1), dn = new Float64Array(tauMax + 1);
+    for (let t = 1; t <= tauMax; t++) d[t] = e0 + (pre[t + W] - pre[t]) - 2 * ar[t]; dn[0] = 1; let run = 0; for (let t = 1; t <= tauMax; t++) { run += d[t]; dn[t] = run > 0 ? d[t] * t / run : 1; }
+    let tau = -1; for (let t = tauMin; t <= tauMax; t++) if (dn[t] < o.thresh) { while (t + 1 <= tauMax && dn[t + 1] < dn[t]) t++; tau = t; break; }
+    if (tau < 0) { let m = 1e9, mt = -1; for (let t = tauMin; t <= tauMax; t++) if (dn[t] < m) { m = dn[t]; mt = t; } if (m > 0.35) return { f0: 0, clarity: Math.max(0, 1 - m), rms }; tau = mt; }
+    // refine on the raw difference function: near its minimum d(u) = a - b cos(w (u - delta)) with w = 2 pi / tau, solved exactly from three samples
+    // (the parabola commonly used is biased when the period is only a few dozen samples)
+    let tf = tau; if (tau > 1 && tau < tauMax) { const m1 = d[tau - 1], z = d[tau], p1 = d[tau + 1], den = m1 + p1 - 2 * z; if (Math.abs(den) > 1e-12) { const w = 2 * Math.PI / tau, ratio = (m1 - p1) / den; tf = tau + Math.atan(ratio * Math.tan(w / 2)) / w; } }
+    return { f0: sr / tf, clarity: Math.max(0, 1 - dn[tau]), rms };
+  }
+  /** Track a whole buffer. Returns { t[], f0[] (0 = unvoiced), clarity[], rms[] }. hop in seconds. */
+  function track(x, sr, opts) {
+    const o = Object.assign({ fmin: 50, fmax: 2000, hop: 0.01, thresh: 0.12 }, opts || {}), N = Math.min(Math.round(3 * sr / o.fmin), 1 << 14), hop = Math.round(o.hop * sr), out = { t: [], f0: [], clarity: [], rms: [] };
+    for (let s = 0; s + N <= x.length; s += hop) { const r = yin(x.subarray(s, s + N), sr, o); out.t.push((s + N / 2) / sr); out.f0.push(r.f0); out.clarity.push(r.clarity); out.rms.push(r.rms); }
+    return out;
+  }
+  /** Distribution of cents-from-nearest-note over confident frames, in 2-cent bins from -50 to 50. */
+  function foldHistogram(f0, clarity, a4, minClarity) {
+    const bins = new Float64Array(50); let n = 0; for (let i = 0; i < f0.length; i++) if (f0[i] > 0 && clarity[i] >= (minClarity == null ? 0.85 : minClarity)) { const c = noteOf(f0[i], a4).cents, b = Math.min(49, Math.max(0, Math.floor((c + 50) / 2))); bins[b]++; n++; } return { bins, n };
+  }
+  /** Circular (period 100 cents) peak of the histogram, refined by a circular mean within 15 cents: the tuning offset of the whole recording in cents relative to the A4 used. */
+  function tuningOffset(f0, clarity, a4, minClarity) {
+    const h = foldHistogram(f0, clarity, a4, minClarity); if (h.n < 20) return null; let bi = 0, bv = -1; for (let i = 0; i < 50; i++) { const s = h.bins[i] + 0.5 * (h.bins[(i + 49) % 50] + h.bins[(i + 1) % 50]); if (s > bv) { bv = s; bi = i; } }
+    const peak = bi * 2 - 49; let sx = 0, sy = 0, w = 0; for (let i = 0; i < f0.length; i++) if (f0[i] > 0 && clarity[i] >= (minClarity == null ? 0.85 : minClarity)) { let c = noteOf(f0[i], a4).cents - peak; if (c > 50) c -= 100; if (c < -50) c += 100; if (Math.abs(c) <= 15) { sx += c; w++; } }
+    let off = peak + (w ? sx / w : 0); if (off > 50) off -= 100; if (off < -50) off += 100; return { cents: off, a4: a4 * Math.pow(2, off / 1200), n: h.n, spread: (() => { let v = 0, k = 0; for (let i = 0; i < f0.length; i++) if (f0[i] > 0 && clarity[i] >= 0.85) { let c = noteOf(f0[i], a4).cents - off; if (c > 50) c -= 100; if (c < -50) c += 100; if (Math.abs(c) <= 30) { v += c * c; k++; } } return k ? Math.sqrt(v / k) : 0; })() };
+  }
+  function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296 * 2 - 1; }; }
+  /**
+   * Test signal. spec: { f0 (Hz), cents (detune), shape: "sine" | "saw" | "odd" | "missing" | "pulse", vibCents, vibHz, noiseDb (noise relative to signal rms, e.g. -20), dur, glideTo (Hz), seed }.
+   */
+  function synth(spec, sr) {
+    const s = Object.assign({ f0: 440, cents: 0, shape: "sine", vibCents: 0, vibHz: 5.5, noiseDb: -200, dur: 2, seed: 1 }, spec), n = Math.round(s.dur * sr), x = new Float64Array(n), r = rng(s.seed), truth = new Float64Array(n);
+    let ph = 0; const H = { sine: [[1, 1]], saw: Array.from({ length: 30 }, (_, i) => [i + 1, 1 / (i + 1)]), odd: Array.from({ length: 12 }, (_, i) => [2 * i + 1, 1 / (2 * i + 1)]), missing: Array.from({ length: 6 }, (_, i) => [i + 3, 1 / (i + 3)]), pulse: Array.from({ length: 40 }, (_, i) => [i + 1, 1]) }[s.shape];
+    for (let i = 0; i < n; i++) { const t = i / sr, base = s.glideTo ? s.f0 * Math.pow(s.glideTo / s.f0, t / s.dur) : s.f0, f = base * Math.pow(2, (s.cents + s.vibCents * Math.sin(2 * Math.PI * s.vibHz * t)) / 1200); truth[i] = f; ph += 2 * Math.PI * f / sr; let v = 0; for (const [k, a] of H) if (k * f < sr / 2.2) v += a * Math.sin(k * ph); x[i] = v; }
+    let e = 0; for (let i = 0; i < n; i++) e += x[i] * x[i]; const rms = Math.sqrt(e / n), k = 0.2 / rms, nz = 0.2 * Math.pow(10, s.noiseDb / 20); for (let i = 0; i < n; i++) x[i] = x[i] * k + nz * r() * 1.7320508;
+    return { x, truth };
+  }
+  /** The built-in self test: known signals through the tracker. Returns rows { name, want (Hz), got (Hz), err (cents), pass }. */
+  function selfTest(sr) {
+    sr = sr || 44100; const rows = [], add = (name, spec0, tol, opts) => { const spec = Object.assign({ dur: 2 }, spec0), { x, truth } = synth(spec, sr), t = track(x, sr, Object.assign({ fmin: 40, fmax: 2500 }, opts || {})); const mid = t.f0.filter((v, i) => t.t[i] > 0.4 && t.t[i] < spec.dur - 0.4 && v > 0); const med = mid.length ? mid.slice().sort((a, b) => a - b)[mid.length >> 1] : 0, want = spec.f0 * Math.pow(2, (spec.cents || 0) / 1200); const err = med ? 1200 * Math.log2(med / want) : NaN; rows.push({ name, want, got: med, err, pass: med > 0 && Math.abs(err) < tol, voiced: mid.length / Math.max(1, t.f0.filter((v, i) => t.t[i] > 0.4 && t.t[i] < spec.dur - 0.4).length) }); };
+    for (const f of [82.41, 220, 440, 1000, 2000]) add(`sine ${f} Hz`, { f0: f, cents: -23 }, 1);
+    add("sawtooth 110 Hz +17 cents", { f0: 110, cents: 17, shape: "saw" }, 1.5); add("odd harmonics 196 Hz", { f0: 196, shape: "odd" }, 1.5); add("missing fundamental (harmonics 3 to 8 of 110 Hz)", { f0: 110, shape: "missing" }, 2); add("narrow pulse train 330 Hz", { f0: 330, shape: "pulse", cents: 8 }, 2);
+    add("sawtooth 220 Hz with noise at -15 dB", { f0: 220, shape: "saw", noiseDb: -15, cents: 12 }, 8); return rows;
+  }
+  g.PitchRuler = { yin, track, noteOf, hz, foldHistogram, tuningOffset, synth, selfTest, NAMES };
+  if (typeof module !== "undefined") module.exports = g.PitchRuler;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+(function () {
+  "use strict";
+  const P = window.PitchRuler, $ = (id) => document.getElementById(id);
+  const S = { src: "mic", a4: 440, ctx: null, stream: null, an: null, raf: 0, hist: [], trace: null, osc: null, play: null, live: false, frames: 0, last: null, lastUi: 0 };
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#888";
+  const fmt = (v, d) => (v == null || !isFinite(v) ? "--" : (v > 0 && d != null ? "+" : "") + v.toFixed(d == null ? 1 : d));
+  const sgn = (v, d) => (v == null || !isFinite(v) ? "--" : (v >= 0 ? "+" : "") + v.toFixed(d));
+  const NOTE_OPTS = []; for (let m = 36; m <= 96; m++) NOTE_OPTS.push(m);
+  const nName = (m) => P.NAMES[m % 12] + (Math.floor(m / 12) - 1);
+  ["tNote", "rNote"].forEach((id) => { const el = $(id); NOTE_OPTS.forEach((m) => el.add(new Option(nName(m), m))); el.value = 69; });
+  function range() { const [a, b] = $("range").value.split(",").map(Number); return { fmin: a, fmax: b, thresh: +$("th").value }; }
+  function labels() { $("vA4").textContent = (+$("a4").value).toFixed(1) + " Hz"; $("vTh").textContent = (+$("th").value).toFixed(2); $("vTc").textContent = sgn(+$("tCents").value, 0) + " cents"; $("vTv").textContent = $("tVib").value + " cents"; $("vTn").textContent = $("tNoise").value + " dB"; S.a4 = +$("a4").value; }
+  ["a4", "th", "tCents", "tVib", "tNoise", "range"].forEach((id) => $(id).addEventListener("input", () => { labels(); if (S.trace && S.src !== "mic") redoTrace(); }));
+  function setSrc(s) { S.src = s; [["sMic", "mic"], ["sFile", "file"], ["sTest", "test"]].forEach(([id, v]) => $(id).setAttribute("aria-pressed", String(v === s))); $("pMic").hidden = s !== "mic"; $("pFile").hidden = s !== "file"; $("pTest").hidden = s !== "test"; }
+  $("sMic").onclick = () => setSrc("mic"); $("sFile").onclick = () => setSrc("file"); $("sTest").onclick = () => setSrc("test");
+
+  function setCanvas(cv) { const dpr = Math.min(2, window.devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.fillStyle = css("--panel"); g.fillRect(0, 0, W, H); return { g, W, H }; }
+  function drawRuler(c) {
+    const { g, W, H } = setCanvas($("ruler")), L = 14, R = 14, pw = W - L - R, X = (v) => L + pw * (v + 50) / 100, y = H / 2 + 6;
+    g.fillStyle = css("--accent"); g.globalAlpha = 0.18; g.fillRect(X(-5), 6, X(5) - X(-5), H - 24); g.globalAlpha = 1; g.strokeStyle = css("--line"); g.fillStyle = css("--mute"); g.font = "11px " + css("--f-mono"); g.lineWidth = 1;
+    for (let v = -50; v <= 50; v += 5) { const big = v % 10 === 0, h = big ? 14 : 8; g.beginPath(); g.moveTo(X(v), y - h / 2 + 4); g.lineTo(X(v), y + h / 2 + 4); g.strokeStyle = v === 0 ? css("--ink") : css("--mute"); g.lineWidth = v === 0 ? 2 : 1; g.stroke(); if (v % 25 === 0) g.fillText((v > 0 ? "+" : "") + v, X(v) - 8, H - 3); }
+    if (c != null && isFinite(c)) { const x = X(Math.max(-50, Math.min(50, c))); g.fillStyle = Math.abs(c) <= 5 ? css("--accent") : css("--lamp"); g.beginPath(); g.moveTo(x, 8); g.lineTo(x - 8, 30); g.lineTo(x + 8, 30); g.closePath(); g.fill(); g.fillRect(x - 1.5, 30, 3, 26); }
+  }
+  function showNow(f0, clarity) {
+    if (f0 > 0) { const n = P.noteOf(f0, S.a4); $("nm").textContent = n.name + n.octave; $("cents").textContent = sgn(n.cents, 1); $("hz").textContent = f0.toFixed(2); $("tag").textContent = Math.abs(n.cents) <= 5 ? "in tune" : n.cents > 0 ? "sharp" : "flat"; $("tag").className = Math.abs(n.cents) <= 5 ? "ok" : ""; $("clar").textContent = "clarity " + clarity.toFixed(2); drawRuler(n.cents); }
+    else { $("nm").textContent = "--"; $("cents").textContent = "--"; $("hz").textContent = "--"; $("tag").textContent = ""; $("clar").textContent = "no clear pitch"; drawRuler(null); }
+  }
+  // ---- trace and statistics -------------------------------------------------------------------------
+  function drawTrace(t, f0, clar) {
+    const { g, W, H } = setCanvas($("trace")), L = 40, R = 8, Tp = 8, Bt = 20, pw = W - L - R, ph = H - Tp - Bt; g.font = "11px " + css("--f-mono"); const v = []; for (let i = 0; i < f0.length; i++) if (f0[i] > 0) v.push(P.noteOf(f0[i], S.a4).exact);
+    if (v.length < 2) { g.fillStyle = css("--mute"); g.fillText("No pitched sound yet.", L, H / 2); return; }
+    const sorted = v.slice().sort((a, b) => a - b), med = sorted[sorted.length >> 1]; let lo = Math.floor(sorted[Math.floor(sorted.length * 0.02)] - 0.6), hi = Math.ceil(sorted[Math.floor(sorted.length * 0.98)] + 0.6); if (hi - lo < 5) { lo = Math.floor(med - 2.5); hi = lo + 5; } if (hi - lo > 40) { lo = Math.floor(med - 20); hi = lo + 40; }
+    const t0 = t[0], t1 = t[t.length - 1] || t0 + 1, X = (x) => L + pw * (x - t0) / Math.max(0.5, t1 - t0), Y = (m) => Tp + ph * (1 - (m - lo) / (hi - lo)); g.lineWidth = 1;
+    for (let m = lo; m <= hi; m++) { g.strokeStyle = css("--line"); g.beginPath(); g.moveTo(L, Y(m)); g.lineTo(W - R, Y(m)); g.stroke(); if (hi - lo <= 24 || m % 12 === 0) { g.fillStyle = css("--mute"); g.fillText(nName(m).replace("\u266f", "#"), 4, Y(m) + 4); } }
+    for (let i = 0; i < f0.length; i++) if (f0[i] > 0) { const e = P.noteOf(f0[i], S.a4); g.fillStyle = Math.abs(e.cents) <= 5 ? css("--accent") : css("--ink"); g.globalAlpha = Math.min(1, 0.25 + clar[i]); g.fillRect(X(t[i]) - 1.2, Y(e.exact) - 1.2, 2.4, 2.4); } g.globalAlpha = 1;
+    g.fillStyle = css("--mute"); g.fillText(`${(t1 - t0).toFixed(1)} s`, W - R - 40, H - 5);
+  }
+  function stats(f0, clar, nVoicedDen) {
+    const cs = []; for (let i = 0; i < f0.length; i++) if (f0[i] > 0 && clar[i] >= 0.85) cs.push(P.noteOf(f0[i], S.a4).cents);
+    const voiced = f0.filter((v) => v > 0).length; $("sVo").textContent = f0.length ? (100 * voiced / f0.length).toFixed(0) : "--";
+    const est = P.tuningOffset(f0, clar, S.a4); $("sA4").textContent = est ? est.a4.toFixed(2) : "--"; $("sMed").textContent = est ? sgn(est.cents, 1) : (cs.length ? sgn(cs.slice().sort((a, b) => a - b)[cs.length >> 1], 1) : "--"); $("sSd").textContent = est ? est.spread.toFixed(1) : "--";
+    const h = P.foldHistogram(f0, clar, S.a4), { g, W, H } = setCanvas($("hist")), L = 8, R = 8, pw = W - L - R; let mx = 1; for (const b of h.bins) mx = Math.max(mx, b); g.fillStyle = css("--accent"); for (let i = 0; i < 50; i++) { const bh = (H - 24) * h.bins[i] / mx; g.fillRect(L + pw * i / 50 + 1, H - 18 - bh, pw / 50 - 2, bh); }
+    g.fillStyle = css("--mute"); g.font = "11px " + css("--f-mono"); g.fillText("-50", L, H - 4); g.fillText("0", L + pw / 2 - 3, H - 4); g.fillText("+50 cents from the nearest note", W - R - 190, H - 4); g.strokeStyle = css("--ink"); g.beginPath(); g.moveTo(L + pw / 2, 4); g.lineTo(L + pw / 2, H - 18); g.stroke();
+    return est;
+  }
+  // ---- microphone ---------------------------------------------------------------------------------
+  async function getCtx() { if (!S.ctx) S.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (S.ctx.state === "suspended") await S.ctx.resume(); return S.ctx; }
+  $("micGo").onclick = async () => {
+    stopMic(); try { const ctx = await getCtx(); S.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }); }
+    catch (e) { $("micSt").textContent = "Microphone is not available in this view. Use a recording or the test instrument, or open the standalone page."; return; }
+    const ctx = S.ctx, src = ctx.createMediaStreamSource(S.stream), an = ctx.createAnalyser(); an.fftSize = 8192; an.smoothingTimeConstant = 0; src.connect(an); S.an = an; S.live = true; S.hist = []; S.t0 = performance.now(); $("micSt").textContent = "listening"; $("srcInfo").textContent = `microphone, ${ctx.sampleRate} Hz`;
+    const buf = new Float32Array(8192); const tick = () => { if (!S.live) return; an.getFloatTimeDomainData(buf); const o = range(), N = Math.min(8192, Math.round(3 * ctx.sampleRate / o.fmin)), r = P.yin(buf.subarray(8192 - N), ctx.sampleRate, o), t = (performance.now() - S.t0) / 1000; S.hist.push({ t, f0: r.f0, clarity: r.clarity }); while (S.hist.length && t - S.hist[0].t > 10) S.hist.shift(); S.frames++;
+      const recent = S.hist.slice(-5).filter((h) => h.f0 > 0).map((h) => h.f0).sort((a, b) => a - b), f = recent.length >= 3 ? recent[recent.length >> 1] : 0; S.last = { f0: f, clarity: r.clarity, raw: r.f0 };
+      if (t - S.lastUi > 0.09) { S.lastUi = t; showNow(f, r.clarity); const h = S.hist; drawTrace(h.map((x) => x.t), h.map((x) => x.f0), h.map((x) => x.clarity)); const w = h.filter((x) => t - x.t <= 5); stats(w.map((x) => x.f0), w.map((x) => x.clarity)); $("hdTr").textContent = "last 10 s"; }
+      S.raf = requestAnimationFrame(tick); }; S.raf = requestAnimationFrame(tick);
+  };
+  function stopMic() { S.live = false; cancelAnimationFrame(S.raf); if (S.stream) { S.stream.getTracks().forEach((t) => t.stop()); S.stream = null; } $("micSt").textContent = ""; }
+  $("micStop").onclick = stopMic;
+  // ---- recordings and the test instrument -------------------------------------------------------------
+  function analyze(x, sr, label) { const o = range(); S.trace = { x, sr, label }; const t = P.track(x, sr, Object.assign({ hop: 0.01 }, o)); S.trace.t = t; showTrace(t); return t; }
+  function showTrace(t) { drawTrace(t.t, t.f0, t.clarity); const est = stats(t.f0, t.clarity); $("hdTr").textContent = S.trace.label; const vv = []; for (let i = 0; i < t.f0.length; i++) if (t.f0[i] > 0 && t.clarity[i] >= 0.85) vv.push(t.f0[i]); if (vv.length) { const m = vv.sort((a, b) => a - b)[vv.length >> 1]; showNow(m, 1); } else showNow(0, 0); return est; }
+  function redoTrace() { if (!S.trace) return; const t = P.track(S.trace.x, S.trace.sr, Object.assign({ hop: 0.01 }, range())); S.trace.t = t; showTrace(t); }
+  $("file").onchange = async () => { const f = $("file").files[0]; if (!f) return; $("fileSt").textContent = "decoding..."; try { const ctx = await getCtx(), b = await ctx.decodeAudioData(await f.arrayBuffer()), x = Float64Array.from(b.getChannelData(0).subarray(0, Math.round(120 * b.sampleRate))); $("fileSt").textContent = "analysing..."; await new Promise((q) => setTimeout(q, 20)); const t0 = performance.now(); analyze(x, b.sampleRate, f.name + ", " + (x.length / b.sampleRate).toFixed(0) + " s"); $("fileSt").textContent = `done in ${(performance.now() - t0).toFixed(0)} ms`; $("srcInfo").textContent = f.name; } catch (e) { $("fileSt").textContent = "Could not read that file."; } };
+  async function runTest() {
+    const m = +$("tNote").value, c = +$("tCents").value, a4 = S.a4, f = P.hz(m, a4), spec = { f0: f, cents: c, shape: $("tShape").value, vibCents: +$("tVib").value, noiseDb: +$("tNoise").value, dur: 3 }, sr = 44100, { x } = P.synth(spec, sr);
+    const t = analyze(x, sr, "test instrument, 3 s"); $("srcInfo").textContent = `commanded ${nName(m)} ${sgn(c, 1)} cents against A4 = ${a4.toFixed(1)} Hz`;
+    const v = []; t.f0.forEach((q, i) => { if (q > 0 && t.t[i] > 0.3 && t.t[i] < 2.7 && t.clarity[i] > 0.85) v.push(q); }); const med = v.sort((a, b) => a - b)[v.length >> 1], meas = med ? P.noteOf(med, a4) : null;
+    S.testResult = med ? { commanded: c, measured: meas.cents, err: meas.cents - c, midi: meas.midi, wantMidi: m } : null; $("tSt").textContent = med ? `measured ${sgn(meas.cents, 2)} cents on ${nName(meas.midi)}, error ${sgn(meas.cents - c, 2)} cents` : "no pitch found (try a lower noise level)";
+    const ctx = await getCtx(); stopPlay(); const b = ctx.createBuffer(1, x.length, sr); const ch = b.getChannelData(0); for (let i = 0; i < x.length; i++) ch[i] = x[i] * 0.5; const s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(); S.play = s;
+  }
+  $("tGo").onclick = runTest; function stopPlay() { if (S.play) { try { S.play.stop(); } catch (e) {} S.play = null; } } $("tStop").onclick = stopPlay;
+  // ---- reference tone and self test ------------------------------------------------------------------
+  $("rPlay").onclick = async () => { const ctx = await getCtx(); stopRef(); const o = ctx.createOscillator(), g = ctx.createGain(); o.type = $("rShape").value; o.frequency.value = P.hz(+$("rNote").value, S.a4); g.gain.value = 0.2; o.connect(g); g.connect(ctx.destination); o.start(); S.osc = o; };
+  function stopRef() { if (S.osc) { try { S.osc.stop(); } catch (e) {} S.osc = null; } } $("rStop").onclick = stopRef;
+  $("stGo").onclick = async () => { $("stSt").textContent = "running..."; await new Promise((q) => setTimeout(q, 30)); const rows = P.selfTest(44100); $("stTb").innerHTML = rows.map((r) => `<tr><td>${r.name}</td><td>${r.want.toFixed(2)}</td><td>${r.got.toFixed(2)}</td><td>${sgn(r.err, 2)}</td><td>${r.pass ? "ok" : "FAIL"}</td></tr>`).join(""); S.selfTest = rows; $("stSt").textContent = rows.every((r) => r.pass) ? "all passed" : "some failed"; };
+  window.addEventListener("resize", () => { drawRuler(null); if (S.trace && S.trace.t) showTrace(S.trace.t); });
+  labels(); drawRuler(null); drawTrace([], [], []); stats([], []);
+  window.__pr = { S, P, runTest, analyze, range, ready: () => 1 };
+})();
+</script>
